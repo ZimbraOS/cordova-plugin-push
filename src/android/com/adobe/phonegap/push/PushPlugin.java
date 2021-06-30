@@ -28,12 +28,15 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.appplant.cordova.plugin.localnotification.LocalNotification;
 import me.leolin.shortcutbadger.ShortcutBadger;
 
 public class PushPlugin extends CordovaPlugin implements PushConstants {
@@ -506,6 +509,199 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
         gCachedExtras.add(extras);
       }
     }
+  }
+
+   public static  void sendExtras_Event_Update (Bundle extras, Context context) throws JSONException {
+    if (extras != null) {
+        Log.d("EVENT_UPDATE", "Event update received in background");
+
+        if(extras.get("messageId") != null) {
+          // Cancelled current notification from local scheduled if already present.
+          LocalNotification.cancel_Event_Update(Integer.parseInt(extras.get("messageId").toString()), context);
+
+          //Scheduled current event
+          JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
+          LocalNotification.schedule_Event_Update(EventData, context);
+
+          // Clear notification after timeout
+          if(extras.get("clearAt") != null) {
+            new java.util.Timer().schedule(
+                    new java.util.TimerTask() {
+                      @Override
+                      public void run() {
+                        LocalNotification.clear_Event_Update(Integer.parseInt(extras.get("messageId").toString()), context);
+                      }
+                    },
+                    clearNotificationTimeOut(extras)
+            );
+          }
+        } else {
+          Log.d("EVENT_UPDATE", "messageId is missing in the event payload");
+        }
+    }
+  }
+
+  private static JSONArray convertJSONArray(JSONObject obj) {
+
+Log.d("EVENT_UPDATE", "Converting JsonObject to JsonArray");
+    JSONObject trigger = new JSONObject();
+    JSONObject progressBar = new JSONObject();
+    JSONObject jsonObject = new JSONObject();
+    try {
+      trigger.put("type", "calendar");
+
+      progressBar.put("enabled", false);
+      progressBar.put("value", 0);
+      progressBar.put("maxValue", 100);
+      progressBar.put("indeterminate", false);
+
+
+      jsonObject.put("action",new JSONArray());
+      jsonObject.put("attachment", new JSONArray());
+      jsonObject.put("autoClear", true);
+      jsonObject.put("badge", null);
+      jsonObject.put("channel", null);
+      jsonObject.put("clock", true);
+      jsonObject.put("data", null);
+      jsonObject.put("color", null);
+      jsonObject.put("defaults", 0);
+      jsonObject.put("foreground", null);
+      jsonObject.put("group", null);
+      jsonObject.put("groupSummary", false);
+      jsonObject.put("icon", null);
+      jsonObject.put("iconTYpe", null);
+      jsonObject.put("id", 0);
+      jsonObject.put("launch", true);
+      jsonObject.put("led", true);
+      jsonObject.put("lockscreen", true);
+      jsonObject.put("mediaSession", null);
+      jsonObject.put("number", 0);
+      jsonObject.put("priority", 0);
+      jsonObject.put("progressBar", progressBar);
+      jsonObject.put("silent", false);
+      jsonObject.put("smallIcon", "res://icon");
+      jsonObject.put("sound", true);
+      jsonObject.put("sticky", false);
+      jsonObject.put("summary", null);
+      jsonObject.put("text", "");
+      jsonObject.put("timeoutAfter", false);
+      jsonObject.put("title", "");
+      jsonObject.put("trigger", trigger);
+      jsonObject.put("vibrate", false);
+      jsonObject.put("wakeup", true);
+
+    } catch (JSONException e) {
+      e.printStackTrace();
+    }
+
+
+    Iterator x = obj.keys();
+
+    while (x.hasNext()){
+      String key = (String) x.next();
+      try {
+        if(jsonObject.has(key)) {
+          jsonObject.remove(key);
+          jsonObject.put(key, obj.get(key));
+        }
+      } catch (JSONException e) {
+        e.printStackTrace();
+      }
+    }
+
+    if(obj.has("messageId")) {
+      try {
+        jsonObject.remove("id");
+        jsonObject.put("id", Integer.parseInt(obj.get("messageId").toString()));
+      } catch (JSONException e) {
+        e.printStackTrace();
+      }
+    }
+
+    if(obj.has("alarm")) {
+      try {
+        Timestamp currentTimeStamp = new Timestamp((new Date()).getTime());
+        Timestamp eventTimeStamp = new Timestamp(Long.parseLong(obj.get("alarm").toString()));
+        int second = (int)(eventTimeStamp.getTime() - currentTimeStamp.getTime())/1000;
+        trigger.put("in", second);
+        trigger.put("unit", "second");
+      } catch (JSONException e) {
+        e.printStackTrace();
+      }
+    }
+
+    return new JSONArray().put(jsonObject);
+  }
+
+  private static JSONObject convertBundleToJson_Event_Update (Bundle extras) {
+    Log.d("EVENT_UPDATE", "convert extras to json");
+    try {
+      JSONObject json = new JSONObject();
+      JSONObject additionalData = new JSONObject();
+
+      // Add any keys that need to be in top level json to this set
+      HashSet<String> jsonKeySet = new HashSet();
+      Collections.addAll(jsonKeySet, TITLE, MESSAGE, COUNT, SOUND, IMAGE);
+
+      Iterator<String> it = extras.keySet().iterator();
+      while (it.hasNext()) {
+        String key = it.next();
+        Object value = extras.get(key);
+
+        Log.d(LOG_TAG, "key = " + key);
+
+        if (jsonKeySet.contains(key)) {
+          json.put(key, value);
+        } else if (key.equals(COLDSTART)) {
+          additionalData.put(key, extras.getBoolean(COLDSTART));
+        } else if (key.equals(FOREGROUND)) {
+          additionalData.put(key, extras.getBoolean(FOREGROUND));
+        } else if (key.equals(DISMISSED)) {
+          additionalData.put(key, extras.getBoolean(DISMISSED));
+        } else if (value instanceof String) {
+          String strValue = (String) value;
+          try {
+            // Try to figure out if the value is another JSON object
+            if (strValue.startsWith("{")) {
+              json.put(key, new JSONObject(strValue));
+            }
+            // Try to figure out if the value is another JSON array
+            else if (strValue.startsWith("[")) {
+              json.put(key, new JSONArray(strValue));
+            } else {
+              json.put(key, value);
+            }
+          } catch (Exception e) {
+            json.put(key, value);
+          }
+        }
+      } // while
+
+      json.put(ADDITIONAL_DATA, additionalData);
+      Log.v(LOG_TAG, "extrasToJSON: " + json.toString());
+
+      return json;
+    } catch (JSONException e) {
+      Log.e(LOG_TAG, "extrasToJSON: JSON exception");
+    }
+    return null;
+  }
+
+
+  private static int clearNotificationTimeOut(Bundle extras) {
+
+    try {
+      if (extras.get("clearAt") != null) {
+        Timestamp currentTimeStamp = new Timestamp((new Date()).getTime());
+        Timestamp eventTimeStamp = new Timestamp(Long.parseLong(extras.get("clearAt").toString()));
+        int miliSecond = (int) (eventTimeStamp.getTime() - currentTimeStamp.getTime());
+        return miliSecond;
+      }
+      return 0;
+    } catch (NullPointerException e) {
+      return 0;
+    }
+
   }
 
   /*
