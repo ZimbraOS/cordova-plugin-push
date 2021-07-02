@@ -28,6 +28,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.Date;
@@ -511,42 +513,93 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
     }
   }
 
-   public static  void sendExtras_Event_Update (Bundle extras, Context context) throws JSONException {
+    public static  void sendExtras_Event_Update (Bundle extras, Context context) throws JSONException {
     if (extras != null) {
-        Log.d("EVENT_UPDATE", "Event update received in background");
+      Log.d("EVENT_UPDATE", "Event update received in background");
 
-        if(extras.get("messageId") != null) {
-          // Cancelled current notification from local scheduled if already present.
-          LocalNotification.cancel_Event_Update(Integer.parseInt(extras.get("messageId").toString()), context);
+      if(extras.get("messageId") != null) {
+        cancelPreviousScheduledEvent(extras.getString("messageId"), context);
 
-          //Scheduled current event
-          JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
-          LocalNotification.schedule_Event_Update(EventData, context);
+        JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
+        LocalNotification.schedule_Event_Update(EventData, context);
 
-          // Clear notification after timeout
-          if(extras.get("clearAt") != null) {
-            new java.util.Timer().schedule(
-                    new java.util.TimerTask() {
-                      @Override
-                      public void run() {
-                        LocalNotification.clear_Event_Update(Integer.parseInt(extras.get("messageId").toString()), context);
-                      }
-                    },
-                    clearNotificationTimeOut(extras)
-            );
-          }
-        } else {
-          Log.d("EVENT_UPDATE", "messageId is missing in the event payload");
-        }
+      } else {
+        Log.d("EVENT_UPDATE", "messageId is missing in the event payload");
+      }
     }
   }
 
-  private static JSONArray convertJSONArray(JSONObject obj) {
+private static JSONArray convertJSONArray(JSONObject fcmData) {
 
-Log.d("EVENT_UPDATE", "Converting JsonObject to JsonArray");
-    JSONObject trigger = new JSONObject();
-    JSONObject progressBar = new JSONObject();
+    Log.d("EVENT_UPDATE", "Converting JsonObject to JsonArray");
+    JSONArray jsonArray = new JSONArray();
+
+      try {
+
+        Long nextAlarm = Long.parseLong(fcmData.get("nextAlarm").toString());
+        JSONArray instances = fcmData.getJSONArray("instances");
+
+        for(int i=0; i< instances.length(); i++) {
+            JSONObject instance = instances.getJSONObject(i);
+            if(Long.parseLong(instance.getString("start")) >= nextAlarm) {
+
+              // Create new default notification object per instance
+              JSONObject notificationObj = getDefaultNotification(fcmData);
+
+              // Update trigger key with instance start time.
+              JSONObject updatedTrigger = new JSONObject();
+              updatedTrigger.put("type", "calendar");
+              updatedTrigger.put("at", Long.parseLong(instance.getString("start")));
+
+              notificationObj.remove("trigger");
+              notificationObj.put("trigger", updatedTrigger);
+
+
+              // Assing event id to number key so when update happend to this event then first plugin remove all schedule old instance based on this number value
+              notificationObj.remove("number");
+              notificationObj.put("number", Long.parseLong(fcmData.getString("messageId")));
+
+              // Set notification unique id.
+              notificationObj.remove("id");
+              notificationObj.put("id", Long.parseLong(fcmData.getString("messageId") + (i+1));
+
+              jsonArray.put(notificationObj);
+            }
+        }
+
+      } catch (JSONException e) {
+        e.printStackTrace();
+      }
+
+    return jsonArray;
+  }
+
+ private static void cancelPreviousScheduledEvent(String messageId, Context context) {
+
+    // Get all previously schedule notification and cancel notiication which is associate with this event
+
+    JSONArray scheduledNotification = LocalNotification.notifications_EVENT_UPDATE(context);
+
+    try {
+      for (int i = 0; i < scheduledNotification.length(); i++) {
+        JSONObject jobject = scheduledNotification.getJSONObject(i);
+
+        if(jobject.getString("number").equals(messageId)) {
+          LocalNotification.cancel_Event_Update(jobject.getInt("id"), context);
+        }
+      }
+    } catch (JSONException e) {
+      e.printStackTrace();
+    }
+
+  }
+
+ private static JSONObject getDefaultNotification(JSONObject fcmObject) {
     JSONObject jsonObject = new JSONObject();
+    JSONObject trigger = new JSONObject();
+
+    // Default Json object with keys value that local notification plugin require.
+    JSONObject progressBar = new JSONObject();
     try {
       trigger.put("type", "calendar");
 
@@ -584,53 +637,44 @@ Log.d("EVENT_UPDATE", "Converting JsonObject to JsonArray");
       jsonObject.put("sticky", false);
       jsonObject.put("summary", null);
       jsonObject.put("text", "");
-      jsonObject.put("timeoutAfter", false);
+      jsonObject.put("timeoutAfter", 5*60*1000);
       jsonObject.put("title", "");
       jsonObject.put("trigger", trigger);
       jsonObject.put("vibrate", false);
       jsonObject.put("wakeup", true);
 
+
+
+    // Update default notification jsonObject's key value as per FCM Payload data.
+      Iterator x = fcmObject.keys();
+
+      while (x.hasNext()) {
+        String key = (String) x.next();
+        try {
+          if (jsonObject.has(key)) {
+            jsonObject.remove(key);
+            jsonObject.put(key, fcmObject.get(key));
+          }
+        } catch (JSONException e) {
+          e.printStackTrace();
+        }
+      }
+
+      // if FCM payload contains event start time then update notification text key
+      if(fcmObject.has("alarmInstStart")) {
+
+        DateFormat dateFormat = new SimpleDateFormat("hh:mm a");
+        Timestamp ts = new Timestamp(Long.parseLong(fcmObject.getString("alarmInstStart")));
+        Date date=new Date(ts.getTime());
+        jsonObject.remove("text");
+        jsonObject.put("text", "Today at " + dateFormat.format(date));
+      }
+
     } catch (JSONException e) {
       e.printStackTrace();
     }
+  return jsonObject;
 
-
-    Iterator x = obj.keys();
-
-    while (x.hasNext()){
-      String key = (String) x.next();
-      try {
-        if(jsonObject.has(key)) {
-          jsonObject.remove(key);
-          jsonObject.put(key, obj.get(key));
-        }
-      } catch (JSONException e) {
-        e.printStackTrace();
-      }
-    }
-
-    if(obj.has("messageId")) {
-      try {
-        jsonObject.remove("id");
-        jsonObject.put("id", Integer.parseInt(obj.get("messageId").toString()));
-      } catch (JSONException e) {
-        e.printStackTrace();
-      }
-    }
-
-    if(obj.has("alarm")) {
-      try {
-        Timestamp currentTimeStamp = new Timestamp((new Date()).getTime());
-        Timestamp eventTimeStamp = new Timestamp(Long.parseLong(obj.get("alarm").toString()));
-        int second = (int)(eventTimeStamp.getTime() - currentTimeStamp.getTime())/1000;
-        trigger.put("in", second);
-        trigger.put("unit", "second");
-      } catch (JSONException e) {
-        e.printStackTrace();
-      }
-    }
-
-    return new JSONArray().put(jsonObject);
   }
 
   private static JSONObject convertBundleToJson_Event_Update (Bundle extras) {
