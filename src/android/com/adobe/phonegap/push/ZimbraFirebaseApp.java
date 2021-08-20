@@ -1,6 +1,7 @@
 package com.adobe.phonegap.push;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
