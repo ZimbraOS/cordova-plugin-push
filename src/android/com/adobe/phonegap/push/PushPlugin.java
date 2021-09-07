@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.sql.Timestamp;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -517,66 +518,168 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
     if (extras != null) {
       Log.d("EVENT_UPDATE", "Event update received in background");
 
-      if(extras.get("messageId") != null) {
-        cancelPreviousScheduledEvent(extras.getString("messageId"), context);
+      if(extras.get("appointmentId") != null) {
+        cancelPreviousScheduledEvent(extras.getString("appointmentId"), context);
 
         JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
         LocalNotification.schedule_Event_Update(EventData, context);
 
       } else {
-        Log.d("EVENT_UPDATE", "messageId is missing in the event payload");
+        Log.d("EVENT_UPDATE", "appointmentId is missing in the event payload");
       }
     }
   }
 
-private static JSONArray convertJSONArray(JSONObject fcmData) {
+
+  private static JSONArray convertJSONArray(JSONObject fcmData) {
 
     Log.d("EVENT_UPDATE", "Converting JsonObject to JsonArray");
     JSONArray jsonArray = new JSONArray();
 
-      try {
+    try {
 
-        Long nextAlarm = Long.parseLong(fcmData.get("nextAlarm").toString());
-        JSONArray instances = fcmData.getJSONArray("instances");
+      JSONArray invitesArray = fcmData.getJSONArray("invites");
+      JSONObject invitee = new JSONObject();
+      JSONArray exceptionInvitee = new JSONArray();
 
-        for(int i=0; i< instances.length(); i++) {
-            JSONObject instance = instances.getJSONObject(i);
-            if(Long.parseLong(instance.getString("start")) >= nextAlarm) {
+      // Go through all invite
+      for (int i=0; i< invitesArray.length(); i++) {
 
-              // Create new default notification object per instance
-              JSONObject notificationObj = getDefaultNotification(fcmData);
+        JSONObject inviteeObject =  invitesArray.getJSONObject(i);
 
-              // Update trigger key with instance start time.
-              JSONObject updatedTrigger = new JSONObject();
-              updatedTrigger.put("type", "calendar");
-              updatedTrigger.put("at", Long.parseLong(instance.getString("start")));
-
-              notificationObj.remove("trigger");
-              notificationObj.put("trigger", updatedTrigger);
-
-
-              // Assing event id to number key so when update happend to this event then first plugin remove all schedule old instance based on this number value
-              notificationObj.remove("number");
-              notificationObj.put("number", Long.parseLong(fcmData.getString("messageId")));
-
-              // Set notification unique id.
-              notificationObj.remove("id");
-              notificationObj.put("id", Long.parseLong(fcmData.getString("messageId") + (i+1));
-
-              jsonArray.put(notificationObj);
-            }
+        if(inviteeObject.has("isException") && inviteeObject.getBoolean("isException")) {
+          exceptionInvitee.put(inviteeObject);
+        } else {
+          invitee = inviteeObject;
         }
-
-      } catch (JSONException e) {
-        e.printStackTrace();
       }
+
+      ArrayList<Long> alarmArray = new ArrayList<Long>();
+      Invites inviteObj = new Invites(fcmData, invitee, exceptionInvitee);
+
+      alarmArray = inviteObj.alarms();
+
+      for(int c=0; c<alarmArray.size(); c++) {
+
+        JSONObject notificationObj = createNewNotification(fcmData, invitee, c);
+        JSONObject updatedTrigger = new JSONObject();
+        updatedTrigger.put("type", "calendar");
+        updatedTrigger.put("at", alarmArray.get(c));
+        notificationObj.remove("trigger");
+        notificationObj.put("trigger", updatedTrigger);
+        jsonArray.put(notificationObj);
+      }
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
     return jsonArray;
   }
 
- private static void cancelPreviousScheduledEvent(String messageId, Context context) {
 
-    // Get all previously schedule notification and cancel notiication which is associate with this event
+  private static Boolean isLastInstance(Long nextAlarm, Long until, int currentCounter, int maxCounter) {
+
+    if (maxCounter > 0) {
+      return currentCounter > maxCounter;
+    } else {
+      return nextAlarm > until;
+    }
+  }
+
+  private static Calendar defaultRecurrence(Calendar calendar, String frequency, int next) {
+
+    switch (frequency) {
+      case "WEEKLY" :
+        calendar.add(Calendar.DAY_OF_WEEK, next * 7);
+        break;
+      case "DAI":
+        calendar.add(Calendar.DAY_OF_WEEK, next);
+        break;
+      case "YEARLY":
+        calendar.add(calendar.YEAR, next);
+        break;
+      case "MON":
+        calendar.add(calendar.MONTH, next);
+        break;
+    }
+    return calendar;
+  }
+
+
+  private static Calendar customRecurrenceWeekly(Calendar calendar, int next, int nextDay) {
+
+    int weekday = calendar.get(Calendar.DAY_OF_WEEK);
+    int days = ((Calendar.SATURDAY - weekday + nextDay) % 7) + (7 * next);
+    calendar.add(Calendar.DAY_OF_YEAR, days);
+    return calendar;
+  }
+
+  private static Calendar customRecurrenceMonthly(Calendar calendar, int dayOfMonth, int nextInterval) {
+
+    calendar.add(Calendar.MONTH, nextInterval);
+    calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+    return calendar;
+  }
+
+  private static Calendar customRecurrenceMonthly(Calendar calendar, String dayOfWeek, int weekOfMonth, int nextInterval) {
+
+    calendar.add(Calendar.MONTH, nextInterval);;
+    calendar.set(Calendar.DAY_OF_WEEK, getWeekDay(dayOfWeek));
+    calendar.set(Calendar.DAY_OF_WEEK_IN_MONTH, weekOfMonth);
+    return calendar;
+  }
+
+
+
+ private static JSONObject createNewNotification(JSONObject fcmData, JSONObject invitee, int counter) throws JSONException {
+
+   JSONObject notificationObj = getDefaultNotification(fcmData);
+   // Set scheduler ID
+   notificationObj.remove("id");
+   notificationObj.put("id", Long.parseLong(fcmData.getString("appointmentId") + (counter+1)));
+
+   // Set event Title
+   notificationObj.remove("title");
+   notificationObj.put("title", invitee.getString("name"));
+
+   // Set Number property with appointmentId
+   notificationObj.remove("number");
+   notificationObj.put("number", Long.parseLong(fcmData.getString("appointmentId")));
+
+
+   // Set notification text
+   if(invitee.getJSONObject("startTime").has("timestamp")) {
+
+     DateFormat dateFormat = new SimpleDateFormat("hh:mm a");
+     Timestamp ts = new Timestamp(Long.parseLong(invitee.getJSONObject("startTime").get("timestamp").toString()));
+     Date date=new Date(ts.getTime());
+     notificationObj.remove("text");
+     notificationObj.put("text", "Today at " + dateFormat.format(date));
+   }
+
+   return notificationObj;
+
+ }
+
+ private static int getWeekDay(String weekday) {
+
+    switch (weekday) {
+      case "SU": return Calendar.SUNDAY;
+      case "MO": return Calendar.MONDAY;
+      case "TU": return Calendar.TUESDAY;
+      case "WE": return Calendar.WEDNESDAY;
+      case "TH": return Calendar.THURSDAY;
+      case "FR": return Calendar.FRIDAY;
+      case "SA": return Calendar.SATURDAY;
+      default:
+        return 0;
+    }
+ }
+
+ private static void cancelPreviousScheduledEvent(String appointmentId, Context context) {
+
+    // Get all previously schedule notification and cancel notification which is associate with this event
 
     JSONArray scheduledNotification = LocalNotification.notifications_EVENT_UPDATE(context);
 
@@ -584,14 +687,13 @@ private static JSONArray convertJSONArray(JSONObject fcmData) {
       for (int i = 0; i < scheduledNotification.length(); i++) {
         JSONObject jobject = scheduledNotification.getJSONObject(i);
 
-        if(jobject.getString("number").equals(messageId)) {
+        if(jobject.getString("number").equals(appointmentId)) {
           LocalNotification.cancel_Event_Update(jobject.getInt("id"), context);
         }
       }
     } catch (JSONException e) {
       e.printStackTrace();
     }
-
   }
 
  private static JSONObject getDefaultNotification(JSONObject fcmObject) {
@@ -658,16 +760,6 @@ private static JSONArray convertJSONArray(JSONObject fcmData) {
         } catch (JSONException e) {
           e.printStackTrace();
         }
-      }
-
-      // if FCM payload contains event start time then update notification text key
-      if(fcmObject.has("alarmInstStart")) {
-
-        DateFormat dateFormat = new SimpleDateFormat("hh:mm a");
-        Timestamp ts = new Timestamp(Long.parseLong(fcmObject.getString("alarmInstStart")));
-        Date date=new Date(ts.getTime());
-        jsonObject.remove("text");
-        jsonObject.put("text", "Today at " + dateFormat.format(date));
       }
 
     } catch (JSONException e) {
