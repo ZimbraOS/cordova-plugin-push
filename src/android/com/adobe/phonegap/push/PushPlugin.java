@@ -577,61 +577,6 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
     return jsonArray;
   }
 
-
-  private static Boolean isLastInstance(Long nextAlarm, Long until, int currentCounter, int maxCounter) {
-
-    if (maxCounter > 0) {
-      return currentCounter > maxCounter;
-    } else {
-      return nextAlarm > until;
-    }
-  }
-
-  private static Calendar defaultRecurrence(Calendar calendar, String frequency, int next) {
-
-    switch (frequency) {
-      case "WEEKLY" :
-        calendar.add(Calendar.DAY_OF_WEEK, next * 7);
-        break;
-      case "DAI":
-        calendar.add(Calendar.DAY_OF_WEEK, next);
-        break;
-      case "YEARLY":
-        calendar.add(calendar.YEAR, next);
-        break;
-      case "MON":
-        calendar.add(calendar.MONTH, next);
-        break;
-    }
-    return calendar;
-  }
-
-
-  private static Calendar customRecurrenceWeekly(Calendar calendar, int next, int nextDay) {
-
-    int weekday = calendar.get(Calendar.DAY_OF_WEEK);
-    int days = ((Calendar.SATURDAY - weekday + nextDay) % 7) + (7 * next);
-    calendar.add(Calendar.DAY_OF_YEAR, days);
-    return calendar;
-  }
-
-  private static Calendar customRecurrenceMonthly(Calendar calendar, int dayOfMonth, int nextInterval) {
-
-    calendar.add(Calendar.MONTH, nextInterval);
-    calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-    return calendar;
-  }
-
-  private static Calendar customRecurrenceMonthly(Calendar calendar, String dayOfWeek, int weekOfMonth, int nextInterval) {
-
-    calendar.add(Calendar.MONTH, nextInterval);;
-    calendar.set(Calendar.DAY_OF_WEEK, getWeekDay(dayOfWeek));
-    calendar.set(Calendar.DAY_OF_WEEK_IN_MONTH, weekOfMonth);
-    return calendar;
-  }
-
-
-
  private static JSONObject createNewNotification(JSONObject fcmData, JSONObject invitee, int counter) throws JSONException {
 
    JSONObject notificationObj = getDefaultNotification(fcmData);
@@ -660,21 +605,6 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
 
    return notificationObj;
 
- }
-
- private static int getWeekDay(String weekday) {
-
-    switch (weekday) {
-      case "SU": return Calendar.SUNDAY;
-      case "MO": return Calendar.MONDAY;
-      case "TU": return Calendar.TUESDAY;
-      case "WE": return Calendar.WEDNESDAY;
-      case "TH": return Calendar.THURSDAY;
-      case "FR": return Calendar.FRIDAY;
-      case "SA": return Calendar.SATURDAY;
-      default:
-        return 0;
-    }
  }
 
  private static void cancelPreviousScheduledEvent(String appointmentId, Context context) {
