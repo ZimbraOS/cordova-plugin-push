@@ -29,6 +29,7 @@ import android.support.v4.app.RemoteInput;
 import android.text.Html;
 import android.text.Spanned;
 import android.util.Log;
+import java.util.Date;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -103,6 +104,11 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
 
       if (clearBadge) {
         PushPlugin.setApplicationIconBadgeNumber(getApplicationContext(), 0);
+      }
+
+      if(extras.getInt(NOT_ID) == 0) {
+        int notId = (int) (new Date().getTime() / 1000);
+        extras.putInt(NOT_ID, notId);
       }
 
       // if we are in the foreground and forceShow is `false` only send data
@@ -282,6 +288,17 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
               String newKey = normalizeKey(key, messageKey, titleKey, newExtras);
               Log.d(LOG_TAG, "replace key " + key + " with " + newKey);
               replaceKey(context, key, newKey, extras, newExtras);
+            } else {
+              Iterator<String> jsonIter = data.keys();
+              while (jsonIter.hasNext()) {
+                String jsonKey = jsonIter.next();
+
+                Log.d(LOG_TAG, "key = data/" + jsonKey);
+
+                String value = data.getString(jsonKey);
+
+                newExtras.putString(jsonKey, value);
+              }
             }
           } catch (JSONException e) {
             Log.e(LOG_TAG, "normalizeExtras: JSON exception");
@@ -392,7 +409,8 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
     String packageName = context.getPackageName();
     Resources resources = context.getResources();
 
-    int notId = parseInt(NOT_ID, extras);
+    int notId = extras.getInt(NOT_ID);
+    
     Intent notificationIntent = new Intent(this, PushHandlerActivity.class);
     notificationIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
     notificationIntent.putExtra(PUSH_BUNDLE, extras);
@@ -1053,10 +1071,10 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
 
   private boolean isAvailableSender (String from) {
     SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(
-      PushPlugin.COM_ADOBE_PHONEGAP_PUSH,
-      Context.MODE_PRIVATE
+            "zimbraMobile",
+            Context.MODE_PRIVATE
     );
-    String savedSenderID = sharedPref.getString(SENDER_ID, "");
+    String savedSenderID = sharedPref.getString("senderID", "");
 
     Log.d(LOG_TAG, "sender id = " + savedSenderID);
 

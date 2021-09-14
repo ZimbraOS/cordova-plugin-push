@@ -58,7 +58,7 @@
     </config-file>
 
     <config-file target="config.xml" parent="/*">
-      <preference name="GradlePluginGoogleServicesEnabled" value="true" />
+      <preference name="GradlePluginGoogleServicesEnabled" value="false" />
       <preference name="GradlePluginGoogleServicesVersion" value="4.2.0" />
     </config-file>
 
@@ -77,6 +77,7 @@
     <source-file src="src/android/com/adobe/phonegap/push/PushPlugin.java" target-dir="src/com/adobe/phonegap/push/"/>
     <source-file src="src/android/com/adobe/phonegap/push/BackgroundActionButtonHandler.java" target-dir="src/com/adobe/phonegap/push/"/>
     <source-file src="src/android/com/adobe/phonegap/push/PushDismissedHandler.java" target-dir="src/com/adobe/phonegap/push/"/>
+    <source-file src="src/android/com/adobe/phonegap/push/ZimbraFirebaseApp.java" target-dir="src/com/adobe/phonegap/push/"/>
   </platform>
 
   <platform name="browser">

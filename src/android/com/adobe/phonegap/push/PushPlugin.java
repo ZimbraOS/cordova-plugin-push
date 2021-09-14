@@ -16,7 +16,6 @@ import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.util.Log;
 
-import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.apache.cordova.CallbackContext;
@@ -216,19 +215,18 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
 
             Log.v(LOG_TAG, "execute: jo=" + jo.toString());
 
-            senderID = getStringResourceByName(GCM_DEFAULT_SENDER_ID);
-
-            Log.v(LOG_TAG, "execute: senderID=" + senderID);
 
             try {
-              token = FirebaseInstanceId.getInstance().getToken();
+              ZimbraFirebaseApp.init(getApplicationContext(), data.getJSONObject(0).getJSONObject("fcm"));
+
+              token = ZimbraFirebaseApp.getInstance().getToken();
             } catch (IllegalStateException e) {
               Log.e(LOG_TAG, "Exception raised while getting Firebase token " + e.getMessage());
             }
 
             if (token == null) {
               try {
-                token = FirebaseInstanceId.getInstance().getToken(senderID, FCM);
+                 token = ZimbraFirebaseApp.getInstance().getToken(ZimbraFirebaseApp.getSenderId(), FCM);
               } catch (IllegalStateException e) {
                 Log.e(LOG_TAG, "Exception raised while getting Firebase token " + e.getMessage());
               }
@@ -314,7 +312,7 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
             if (topics != null && !"".equals(registration_id)) {
               unsubscribeFromTopics(topics, registration_id);
             } else {
-              FirebaseInstanceId.getInstance().deleteInstanceId();
+              ZimbraFirebaseApp.getInstance().deleteInstanceId();
               Log.v(LOG_TAG, "UNREGISTER");
 
               // Remove shared prefs
@@ -642,6 +640,8 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
           additionalData.put(key, extras.getBoolean(FOREGROUND));
         } else if (key.equals(DISMISSED)) {
           additionalData.put(key, extras.getBoolean(DISMISSED));
+        } else if (key.equals(NOT_ID)) {
+          additionalData.put(key, extras.getInt(NOT_ID));
         } else if (value instanceof String) {
           String strValue = (String) value;
           try {
