@@ -112,7 +112,7 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
       }
 
       // if Push notification is EVENT update then scheduled received event change.
-      if(extras.get("type") != null && extras.get("type").equals("APPOINTMENT")) {
+      if(extras.get("type") != null && extras.get("type").equals(APPOINTMENT)) {
         Log.d("EVENT_UPDATE", "EVENT_UPDATE Received");
         try {
           PushPlugin.sendExtras_Event_Update(extras, applicationContext);

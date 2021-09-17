@@ -521,8 +521,12 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
       if(extras.get("appointmentId") != null) {
         cancelPreviousScheduledEvent(extras.getString("appointmentId"), context);
 
-        JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
-        LocalNotification.schedule_Event_Update(EventData, context);
+        // FolderId = "3" means appointment has been deleted and move to trash folder. 
+        // trash folder id is 3 So skipping generating reminder for this event
+        if(!extras.getString("folderId").equals("3")) {
+          JSONArray EventData = convertJSONArray(convertBundleToJson_Event_Update(extras));
+          LocalNotification.schedule_Event_Update(EventData, context);
+        }
 
       } else {
         Log.d("EVENT_UPDATE", "appointmentId is missing in the event payload");
