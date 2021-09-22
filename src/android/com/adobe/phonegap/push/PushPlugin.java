@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 import de.appplant.cordova.plugin.localnotification.LocalNotification;
 import me.leolin.shortcutbadger.ShortcutBadger;
@@ -561,7 +562,26 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
       ArrayList<Long> alarmArray = new ArrayList<Long>();
       Invites inviteObj = new Invites(fcmData, invitee, exceptionInvitee);
 
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'hhmmss'Z'");
+      sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+      Long reminderBefore = 0l;
+      Long eventDuration = 0l;
+      String eventId = "";
+
       alarmArray = inviteObj.alarms();
+
+      // Calculate reminder value in milliseconds if reminderEnable
+      if (alarmArray.size() > 0) {
+        Long reminder = convertToLong(invitee.getJSONArray("alarms").getJSONObject(0).getString("trigger"));
+        reminderBefore = (reminder * 1000 * 60) * -1;
+
+        Long eventStartTime = Long.parseLong(invitee.getJSONObject("startTime").getString("timestamp"));
+        Long eventEndTime = Long.parseLong(invitee.getJSONObject("endTime").getString("timestamp"));
+        eventDuration = eventEndTime - eventStartTime;
+        eventId = "CHeckWIthPrashant";
+      }
+
 
       for(int c=0; c<alarmArray.size(); c++) {
 
@@ -571,6 +591,22 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
         updatedTrigger.put("at", alarmArray.get(c));
         notificationObj.remove("trigger");
         notificationObj.put("trigger", updatedTrigger);
+
+
+        // Add reminderBefore value to instance alarmTime
+        Long instanceStartTime = alarmArray.get(c) + reminderBefore;
+        Timestamp ts = new Timestamp(instanceStartTime);
+        Date date=new Date(ts.getTime());
+
+        JSONObject eventDetailsUrlData = new JSONObject();
+        eventDetailsUrlData.put("inviteId",eventId);
+        eventDetailsUrlData.put("utcRecurrenceId", sdf.format(date));
+        eventDetailsUrlData.put("instanceStart", instanceStartTime.toString());
+        eventDetailsUrlData.put("instanceEnd", (instanceStartTime + eventDuration));
+
+        notificationObj.remove("data");
+        notificationObj.put("data", eventDetailsUrlData);
+
         jsonArray.put(notificationObj);
       }
 
@@ -701,6 +737,15 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
     }
   return jsonObject;
 
+  }
+
+
+  private static Long convertToLong(String value) {
+    try {
+      return Long.parseLong(value);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   private static JSONObject convertBundleToJson_Event_Update (Bundle extras) {
