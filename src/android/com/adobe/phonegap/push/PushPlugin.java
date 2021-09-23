@@ -559,7 +559,7 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
         }
       }
 
-      ArrayList<Long> alarmArray = new ArrayList<Long>();
+      ArrayList<JSONObject> alarmArray = new ArrayList<JSONObject>();
       Invites inviteObj = new Invites(fcmData, invitee, exceptionInvitee);
 
       SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'hhmmss'Z'");
@@ -567,7 +567,6 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
 
       Long reminderBefore = 0l;
       Long eventDuration = 0l;
-      String eventId = "";
 
       alarmArray = inviteObj.alarms();
 
@@ -579,27 +578,29 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
         Long eventStartTime = Long.parseLong(invitee.getJSONObject("startTime").getString("timestamp"));
         Long eventEndTime = Long.parseLong(invitee.getJSONObject("endTime").getString("timestamp"));
         eventDuration = eventEndTime - eventStartTime;
-        eventId = "CHeckWIthPrashant";
       }
 
 
       for(int c=0; c<alarmArray.size(); c++) {
 
+        Long alarmAt = alarmArray.get(c).getLong("triggerAt");
+        String eventDetailId = alarmArray.get(c).getString("eventDetailId");
+
         JSONObject notificationObj = createNewNotification(fcmData, invitee, c);
         JSONObject updatedTrigger = new JSONObject();
         updatedTrigger.put("type", "calendar");
-        updatedTrigger.put("at", alarmArray.get(c));
+        updatedTrigger.put("at", alarmAt);
         notificationObj.remove("trigger");
         notificationObj.put("trigger", updatedTrigger);
 
 
         // Add reminderBefore value to instance alarmTime
-        Long instanceStartTime = alarmArray.get(c) + reminderBefore;
+        Long instanceStartTime = alarmAt + reminderBefore;
         Timestamp ts = new Timestamp(instanceStartTime);
         Date date=new Date(ts.getTime());
 
         JSONObject eventDetailsUrlData = new JSONObject();
-        eventDetailsUrlData.put("inviteId",eventId);
+        eventDetailsUrlData.put("inviteId", eventDetailId);
         eventDetailsUrlData.put("utcRecurrenceId", sdf.format(date));
         eventDetailsUrlData.put("instanceStart", instanceStartTime.toString());
         eventDetailsUrlData.put("instanceEnd", (instanceStartTime + eventDuration));
