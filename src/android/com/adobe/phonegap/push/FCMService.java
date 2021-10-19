@@ -111,8 +111,17 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
         extras.putInt(NOT_ID, notId);
       }
 
+      // if Push notification is EVENT update then scheduled received event change.
+      if(extras.get("type") != null && extras.get("type").equals(APPOINTMENT)) {
+        Log.d("EVENT_UPDATE", "EVENT_UPDATE Received");
+        try {
+          PushPlugin.sendExtras_Event_Update(extras, applicationContext);
+        } catch (JSONException e) {
+          e.printStackTrace();
+        }
+      }
       // if we are in the foreground and forceShow is `false` only send data
-      if (!forceShow && PushPlugin.isInForeground()) {
+      else if (!forceShow && PushPlugin.isInForeground()) {
         Log.d(LOG_TAG, "foreground");
         extras.putBoolean(FOREGROUND, true);
         extras.putBoolean(COLDSTART, false);
