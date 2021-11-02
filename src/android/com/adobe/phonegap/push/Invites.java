@@ -22,7 +22,7 @@ public class Invites {
     private String[] byDayList = new String[0], byMonthDayList, byMonthList;
     private Boolean isMaxInstance = false;
     private int currentInstance =0;
-    private ArrayList<Long> alarmArray = new ArrayList<Long>();
+    private ArrayList<JSONObject> alarmArray = new ArrayList<JSONObject>();
 
     private int dayOfMonth = -1;
     private String dayOfWeek = null;
@@ -33,6 +33,7 @@ public class Invites {
     private Boolean isException = false;
     private HashMap<String, JSONObject> inviteExceptions = new HashMap<String, JSONObject>();
     private Long reminderBefore = null;
+    private String appointmentDetailID = "";
 
     private DateFormat dateFormat = new SimpleDateFormat("dd-MM-YYYY");
 
@@ -46,6 +47,7 @@ public class Invites {
             reminderBefore = (reminder * 1000 * 60);
         }
 
+        appointmentDetailID = invitee.getString("calItemId") + "-" + invitee.getString("msgId");
 
         if (isRecurrence) {
             JSONObject recurrenceObj = invitee.getJSONArray("recurrence").getJSONObject(0);
@@ -102,19 +104,21 @@ public class Invites {
             for(int i=0; i< exceptions.length(); i++) {
                 String startTime = exceptions.getJSONObject(i).getJSONObject("startTime").getString("timestamp");
                 String status = exceptions.getJSONObject(i).getString("status");
+                String appointmentEventDetailId = exceptions.getJSONObject(i).getString("calItemId") + "-" + exceptions.getJSONObject(i).getString("msgId");
 
                 Date dt = new Date(Long.parseLong(startTime));
                 String exceptionDate = dateFormat.format(dt);
                 JSONObject exceptionDetails = new JSONObject();
                 exceptionDetails.put("startTime", startTime);
                 exceptionDetails.put("status", status);
+                exceptionDetails.put("appointmentDetailID", appointmentEventDetailId);
                 inviteExceptions.put(exceptionDate, exceptionDetails);
             }
         }
     }
 
 
-    public ArrayList<Long> alarms () {
+    public ArrayList<JSONObject> alarms () {
 
         if (reminder != null) {
             if (isCustomRecurrence) {
@@ -394,7 +398,20 @@ public class Invites {
     private void getEventAlarm() {
         Calendar calendar = (Calendar) startDate.clone();
         Long nextAlarm = calendar.getTimeInMillis();
-        alarmArray.add(nextAlarm + reminderBefore);
+        alarmArray.add(alarmAndDetailsId(nextAlarm + reminderBefore, appointmentDetailID));
+    }
+
+    private JSONObject alarmAndDetailsId(Long alarmAt, String eventDetailId) {
+
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("triggerAt", alarmAt);
+            obj.put("eventDetailId", eventDetailId);
+        } catch (Exception e) {
+            System.out.println(e);
+            return  obj;
+        }
+        return obj;
     }
 
     private int getWeekDay(String weekday) {
@@ -429,7 +446,8 @@ public class Invites {
                     try {
                         if (inviteExceptions.get(currentDate).getString("status").equals("CONF")) {
                             // Update alarm for current exception and remove it from the list
-                            alarmArray.add(Long.parseLong(inviteExceptions.get(currentDate).getString("startTime")) + reminderBefore);
+                            Long alarmAt = Long.parseLong(inviteExceptions.get(currentDate).getString("startTime")) + reminderBefore;
+                            alarmArray.add(alarmAndDetailsId(alarmAt, inviteExceptions.get(currentDate).getString("appointmentDetailID")));
                             inviteExceptions.remove(currentDate);
                         } else {
                             // This is cancelled exception. Just remove it from the list and do not add alarm for this day
@@ -439,10 +457,10 @@ public class Invites {
                         System.out.println(e.getMessage());
                     }
                 } else {
-                    alarmArray.add(nextAlarm + reminderBefore);
+                    alarmArray.add(alarmAndDetailsId(nextAlarm + reminderBefore, appointmentDetailID));
                 }
             }else {
-                alarmArray.add(nextAlarm + reminderBefore);
+                alarmArray.add(alarmAndDetailsId(nextAlarm + reminderBefore, appointmentDetailID));
             }
             currentInstance++;
         } else {
