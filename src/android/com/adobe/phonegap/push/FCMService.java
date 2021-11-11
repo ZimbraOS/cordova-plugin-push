@@ -111,6 +111,38 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
         extras.putInt(NOT_ID, notId);
       }
 
+      // Add addtionnal options to mail notification.
+      if(extras.get("type") != null && !(extras.get("type").equals(APPOINTMENT))) {
+        try {
+          JSONObject objReply = new JSONObject();
+          objReply.put("icon", "app");
+          objReply.put("title", "Reply");
+          objReply.put("callback", "doReply");
+          objReply.put("foreground", true);
+
+          JSONObject objMarkAsRead = new JSONObject();
+          objMarkAsRead.put("icon", "app");
+          objMarkAsRead.put("title", "Mark As Read");
+          objMarkAsRead.put("callback", "doMarkAsRead");
+          objMarkAsRead.put("foreground", false);
+
+          JSONObject objDelete = new JSONObject();
+          objDelete.put("icon", "app");
+          objDelete.put("title", "Delete");
+          objDelete.put("callback", "doDelete");
+          objDelete.put("foreground", false);
+
+          JSONArray actionsArray = new JSONArray();
+          actionsArray.put(objReply);
+          actionsArray.put(objMarkAsRead);
+          actionsArray.put(objDelete);
+
+          extras.putString(ACTIONS, actionsArray.toString());
+        } catch (Exception e) {
+          System.out.println(e);
+        }
+    }
+
       // if Push notification is EVENT update then scheduled received event change.
       if(extras.get("type") != null && extras.get("type").equals(APPOINTMENT)) {
         Log.d("EVENT_UPDATE", "EVENT_UPDATE Received");
