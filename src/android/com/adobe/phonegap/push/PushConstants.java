@@ -104,4 +104,5 @@ public interface PushConstants {
   public static final String CLEAR_NOTIFICATION = "clearNotification";
   public static final String MESSAGE_ID = "google.message_id";
   public static final String APPOINTMENT = "APPOINTMENT";
+  public static final String INVITE_MAIL = "INVITE_MAIL";
 }
