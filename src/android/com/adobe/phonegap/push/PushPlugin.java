@@ -594,6 +594,22 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
         notificationObj.put("trigger", updatedTrigger);
 
 
+        // Add Snooze and Dismiss options.
+        JSONObject snoozeObj = new JSONObject();
+        snoozeObj.put("id", "snooze");
+        snoozeObj.put("title", "Snooze");
+
+        JSONObject dismissObj = new JSONObject();
+        dismissObj.put("id", "dismiss");
+        dismissObj.put("title", "Dismiss");
+
+        JSONArray actionsArray = new JSONArray();
+        actionsArray.put(snoozeObj);
+        actionsArray.put(dismissObj);
+
+        notificationObj.remove("actions");
+        notificationObj.put("actions", actionsArray);
+
         // Add reminderBefore value to instance alarmTime
         Long instanceStartTime = alarmAt + reminderBefore;
         Timestamp ts = new Timestamp(instanceStartTime);
@@ -682,7 +698,7 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
       progressBar.put("indeterminate", false);
 
 
-      jsonObject.put("action",new JSONArray());
+      jsonObject.put("actions",new JSONArray());
       jsonObject.put("attachment", new JSONArray());
       jsonObject.put("autoClear", true);
       jsonObject.put("badge", null);

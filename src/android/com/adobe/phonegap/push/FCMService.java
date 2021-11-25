@@ -112,7 +112,7 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
       }
 
       // Add addtionnal options to mail notification.
-      if(extras.get("type") != null && !(extras.get("type").equals(APPOINTMENT))) {
+      if(extras.get("type") != null && extras.get("type").equals(MESSAGE.toUpperCase())) {
         try {
           JSONObject objReply = new JSONObject();
           objReply.put("icon", "app");
@@ -142,6 +142,38 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
           System.out.println(e);
         }
     }
+
+      // Add addtionnal options to Invitation notification.
+      if(extras.get("type") != null && extras.get("type").equals(INVITE_MAIL)) {
+        try {
+          JSONObject objAccept = new JSONObject();
+          objAccept.put("icon", "app");
+          objAccept.put("title", "Accept");
+          objAccept.put("callback", "doAccept");
+          objAccept.put("foreground", true);
+
+          JSONObject objDecline = new JSONObject();
+          objDecline.put("icon", "app");
+          objDecline.put("title", "Decline");
+          objDecline.put("callback", "doDecline");
+          objDecline.put("foreground", true);
+
+          JSONObject objTentative = new JSONObject();
+          objTentative.put("icon", "app");
+          objTentative.put("title", "Tentative");
+          objTentative.put("callback", "doTentative");
+          objTentative.put("foreground", true);
+
+          JSONArray actionsArray = new JSONArray();
+          actionsArray.put(objAccept);
+          actionsArray.put(objDecline);
+          actionsArray.put(objTentative);
+
+          extras.putString(ACTIONS, actionsArray.toString());
+        } catch (Exception e) {
+          System.out.println(e);
+        }
+      }
 
       // if Push notification is EVENT update then scheduled received event change.
       if(extras.get("type") != null && extras.get("type").equals(APPOINTMENT)) {
